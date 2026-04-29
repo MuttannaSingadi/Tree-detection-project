@@ -1,0 +1,268 @@
+<!doctype html>
+<html>
+<head>
+  <title>Polygon Editor</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+</head>
+
+<body style="text-align:center">
+
+<h2>🌳 Tree Detection</h2>
+
+<form method="POST" enctype="multipart/form-data">
+  <input type="file" name="image" required>
+  <button type="submit">Upload</button>
+</form>
+
+{% if result %}
+
+<canvas id="canvas" style="border:1px solid black"></canvas>
+
+<br><br>
+<button onclick="savePolygons()">💾 Save</button>
+<button onclick="deletePolygon()">🗑 Delete Polygon</button>
+<button onclick="undo()">↩️ Undo</button>
+
+<div id="result"></div>
+
+<script>
+const canvas = new fabric.Canvas('canvas');
+
+// 🔥 ADD THIS
+let history = [];
+let isRestoring = false;
+
+// Save state on changes
+canvas.on('object:added', saveState);
+canvas.on('object:modified', saveState);
+canvas.on('object:removed', saveState);
+
+// =======================
+// ✅ LOAD IMAGE + POLYGONS
+// =======================
+fabric.Image.fromURL("{{ url_for('static', filename=image_file) }}", function(img) {
+
+  canvas.setWidth(img.width);
+  canvas.setHeight(img.height);
+
+  canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+
+  const polygons = {{ polygons | tojson | safe }};
+
+  polygons.forEach(poly => {
+
+    const pts = poly.map(p => ({ x: p[0], y: p[1] }));
+
+    const shape = new fabric.Polygon(pts, {
+      fill: 'rgba(255,0,0,0.3)',
+      stroke: 'red',
+      strokeWidth: 2,
+      selectable: true,
+      objectCaching: false
+    });
+
+    canvas.add(shape);
+
+    enableVertexEditing(shape);
+  });
+
+  canvas.renderAll();
+
+  // 🔥 ADD THIS (initial state)
+  saveState();
+});
+
+
+// =======================
+// 🔥 VERTEX EDITING
+// =======================
+function enableVertexEditing(polygon) {
+
+  polygon.cornerStyle = 'circle';
+  polygon.cornerColor = 'blue';
+
+  polygon.controls = {};
+
+  polygon.points.forEach((point, index) => {
+
+    polygon.controls["p" + index] = new fabric.Control({
+
+      positionHandler: function(dim, finalMatrix, fabricObject) {
+
+        const x = fabricObject.points[index].x - fabricObject.pathOffset.x;
+        const y = fabricObject.points[index].y - fabricObject.pathOffset.y;
+
+        return fabric.util.transformPoint(
+          new fabric.Point(x, y),
+          fabric.util.multiplyTransformMatrices(
+            fabricObject.canvas.viewportTransform,
+            fabricObject.calcTransformMatrix()
+          )
+        );
+      },
+
+      actionHandler: function(eventData, transform, x, y) {
+
+        const polygon = transform.target;
+
+        const mouseLocal = polygon.toLocalPoint(
+          new fabric.Point(x, y),
+          'center',
+          'center'
+        );
+
+        polygon.points[index].x = mouseLocal.x + polygon.pathOffset.x;
+        polygon.points[index].y = mouseLocal.y + polygon.pathOffset.y;
+
+        polygon.setCoords();
+        canvas.renderAll();
+
+        return true;
+      },
+
+      cursorStyle: 'pointer'
+    });
+
+  });
+
+  polygon.setCoords();
+}
+
+
+// =======================
+// ✅ GET POLYGONS
+// =======================
+function getPolygons() {
+
+  return canvas.getObjects()
+    .filter(obj => obj.type === 'polygon')
+    .map(obj => {
+
+      const matrix = obj.calcTransformMatrix();
+
+      return obj.points.map(p => {
+
+        const local = new fabric.Point(
+          p.x - obj.pathOffset.x,
+          p.y - obj.pathOffset.y
+        );
+
+        const pt = fabric.util.transformPoint(local, matrix);
+
+        return {
+          x: pt.x,
+          y: pt.y
+        };
+      });
+
+    });
+}
+
+
+// =======================
+// 🗑 DELETE POLYGON
+// =======================
+function deletePolygon() {
+
+  const activeObject = canvas.getActiveObject();
+
+  if (!activeObject) {
+    alert("Select a polygon first");
+    return;
+  }
+
+  if (activeObject.type !== 'polygon') {
+    alert("Selected object is not a polygon");
+    return;
+  }
+
+  canvas.remove(activeObject);
+  canvas.discardActiveObject();
+  canvas.renderAll();
+}
+
+
+// =======================
+// 🔥 FIXED UNDO SYSTEM
+// =======================
+
+// Save state
+function saveState() {
+
+  if (isRestoring) return;
+
+  const json = canvas.toJSON();
+
+  history.push(json);
+
+  if (history.length > 20) {
+    history.shift();
+  }
+}
+
+// Undo
+function undo() {
+
+  if (history.length <= 1) {
+    alert("Nothing to undo");
+    return;
+  }
+
+  isRestoring = true;
+
+  history.pop(); // remove current state
+  const prevState = history[history.length - 1];
+
+  canvas.loadFromJSON(prevState, function () {
+
+    canvas.renderAll();
+
+    canvas.getObjects().forEach(obj => {
+      if (obj.type === 'polygon') {
+        enableVertexEditing(obj);
+      }
+    });
+
+    isRestoring = false;
+  });
+}
+
+
+// =======================
+// 💾 SAVE IMAGE
+// =======================
+function savePolygons() {
+
+  const data = getPolygons();
+
+  fetch("/save", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      polygons: data,
+      image_file: "{{ image_file }}"
+    })
+  })
+  .then(res => res.json())
+  .then(res => {
+
+    if (res.status === "success") {
+
+      const url = "/static/" + res.image;
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.image;
+      a.click();
+
+      document.getElementById("result").innerHTML =
+        `<img src="${url}" width="400">`;
+    }
+  });
+}
+</script>
+
+{% endif %}
+
+</body>
+</html>
