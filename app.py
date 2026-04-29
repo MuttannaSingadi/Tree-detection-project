@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import time
 import os
+import gdown   # ✅ ADDED
 from train import UNet
 
 app = Flask(__name__)
@@ -11,7 +12,16 @@ os.makedirs("static", exist_ok=True)
 
 # Load model
 model = UNet()
-model.load_state_dict(torch.load("tree_model.pth", map_location="cpu"))
+
+# ✅ ADDED: Download model if not exists
+MODEL_PATH = "tree_model.pth"
+
+if not os.path.exists(MODEL_PATH):
+    print("Downloading model...")
+    url = "https://drive.google.com/uc?id=18f_AoVIBaez_0bPpK-3cOyE8pySjtTzH"
+    gdown.download(url, MODEL_PATH, quiet=False)
+
+model.load_state_dict(torch.load(MODEL_PATH, map_location="cpu"))
 model.eval()
 
 
