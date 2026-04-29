@@ -31,7 +31,7 @@ let isRestoring = false;
 let currentImageFile = "";
 
 // =======================
-// 🚀 CALL RENDER BACKEND (FIXED ONLY THIS PART)
+// 🚀 CALL BACKEND (FIXED)
 // =======================
 async function uploadImage() {
 
@@ -45,23 +45,28 @@ async function uploadImage() {
   const formData = new FormData();
   formData.append("image", fileInput.files[0]);
 
+  // Send image to backend
   const response = await fetch("https://tree-detection-project.onrender.com/", {
     method: "POST",
     body: formData
   });
 
-  // ✅ FIX START (only this logic changed)
-  const timestamp = Math.floor(Date.now() / 1000);
-  const filename = timestamp + ".jpg";
+  // ✅ FIX: get correct data from backend
+  const data = await response.json();   // get JSON response
 
-  currentImageFile = filename;
+  if (!data.image) {
+    alert("Error processing image");
+    return;
+  }
 
-  const imageUrl = "https://tree-detection-project.onrender.com/static/" + filename;
+  // store correct filename
+  currentImageFile = data.image;
 
-  setTimeout(() => {
-      loadCanvas(imageUrl, []);
-  }, 1500);
-  // ✅ FIX END
+  // correct image URL from backend
+  const imageUrl = "https://tree-detection-project.onrender.com/static/" + data.image;
+
+  // load image + polygons
+  loadCanvas(imageUrl, data.polygons);
 }
 
 // =======================
@@ -75,6 +80,7 @@ function loadCanvas(imageUrl, polygons) {
     canvas.setHeight(img.height);
     canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
 
+    // draw polygons from backend
     polygons.forEach(poly => {
       const pts = poly.map(p => ({ x: p[0], y: p[1] }));
 
@@ -223,7 +229,7 @@ function undo() {
 }
 
 // =======================
-// SAVE TO BACKEND (UNCHANGED)
+// SAVE (UNCHANGED)
 // =======================
 function savePolygons() {
 
