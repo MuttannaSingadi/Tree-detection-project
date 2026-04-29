@@ -50,6 +50,7 @@
 <button class="btn-save" onclick="savePolygons()">💾 Save</button>
 <button class="btn-delete" onclick="deletePolygon()">🗑 Delete Polygon</button>
 <button class="btn-undo" onclick="undo()">↩️ Undo</button>
+<button onclick="startDrawing()">➕ Add Polygon</button>
 
 <!-- Polygon count -->
 <div id="polygonCount">Polygons: 0</div>
@@ -260,6 +261,72 @@ function undo() {
     isRestoring = false;
   });
 }
+
+// =======================
+// ADD POLYGON DRAW MODE
+// =======================
+
+let drawing = false;
+let points = [];
+let tempLines = [];
+
+// Start drawing
+function startDrawing() {
+  drawing = true;
+  points = [];
+  tempLines.forEach(l => canvas.remove(l));
+  tempLines = [];
+}
+
+// Handle mouse click
+canvas.on('mouse:down', function(options) {
+
+  if (!drawing) return;
+
+  const pointer = canvas.getPointer(options.e);
+
+  points.push({ x: pointer.x, y: pointer.y });
+
+  // draw temporary line
+  if (points.length > 1) {
+    const line = new fabric.Line([
+      points[points.length - 2].x,
+      points[points.length - 2].y,
+      pointer.x,
+      pointer.y
+    ], {
+      stroke: 'blue',
+      selectable: false
+    });
+
+    tempLines.push(line);
+    canvas.add(line);
+  }
+});
+
+// Finish polygon on double click
+canvas.on('mouse:dblclick', function() {
+
+  if (!drawing || points.length < 3) return;
+
+  drawing = false;
+
+  // remove temp lines
+  tempLines.forEach(l => canvas.remove(l));
+  tempLines = [];
+
+  const polygon = new fabric.Polygon(points, {
+    fill: 'rgba(0,255,0,0.3)',
+    stroke: 'green',
+    strokeWidth: 2,
+    selectable: true
+  });
+
+  canvas.add(polygon);
+  enableVertexEditing(polygon);
+
+  points = [];
+});
 
 // Save to backend
 function savePolygons() {
