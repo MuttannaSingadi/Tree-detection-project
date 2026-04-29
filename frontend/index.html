@@ -9,7 +9,6 @@
 
 <h2>🌳 Tree Detection</h2>
 
-<!-- ✅ UPDATED FORM -->
 <input type="file" id="imageInput" required>
 <button onclick="uploadImage()">Upload</button>
 
@@ -32,7 +31,7 @@ let isRestoring = false;
 let currentImageFile = "";
 
 // =======================
-// 🚀 CALL RENDER BACKEND
+// 🚀 CALL RENDER BACKEND (FIXED ONLY THIS PART)
 // =======================
 async function uploadImage() {
 
@@ -46,28 +45,23 @@ async function uploadImage() {
   const formData = new FormData();
   formData.append("image", fileInput.files[0]);
 
-  // ✅ FIXED URL
   const response = await fetch("https://tree-detection-project.onrender.com/", {
     method: "POST",
     body: formData
   });
 
-  const html = await response.text();
+  // ✅ FIX START (only this logic changed)
+  const timestamp = Math.floor(Date.now() / 1000);
+  const filename = timestamp + ".jpg";
 
-  // Extract needed data
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
+  currentImageFile = filename;
 
-  const img = doc.querySelector("img");
-  if (!img) {
-    alert("Error processing image");
-    return;
-  }
+  const imageUrl = "https://tree-detection-project.onrender.com/static/" + filename;
 
-  const imageUrl = img.src;
-  currentImageFile = imageUrl.split("/").pop();
-
-  loadCanvas(imageUrl, []);
+  setTimeout(() => {
+      loadCanvas(imageUrl, []);
+  }, 1500);
+  // ✅ FIX END
 }
 
 // =======================
@@ -229,7 +223,7 @@ function undo() {
 }
 
 // =======================
-// SAVE TO BACKEND
+// SAVE TO BACKEND (UNCHANGED)
 // =======================
 function savePolygons() {
 
