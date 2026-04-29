@@ -18,7 +18,13 @@ model.eval()
 @app.route("/", methods=["GET", "POST"])
 def index():
     if request.method == "POST":
+        if "image" not in request.files:
+            return render_template("index.html", result=False)
+
         file = request.files["image"]
+
+        if file.filename == "":
+            return render_template("index.html", result=False)
 
         filename = f"{int(time.time())}.jpg"
         filepath = os.path.join("static", filename)
@@ -87,4 +93,4 @@ def save():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=10000)
