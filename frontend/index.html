@@ -3,6 +3,35 @@
 <head>
   <title>Polygon Editor</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+
+  <!-- UI Styling -->
+  <style>
+    body { font-family: Arial; background:#f4f6f8; }
+    h2 { color:#2c3e50; }
+
+    button {
+      padding:8px 14px;
+      margin:5px;
+      border:none;
+      border-radius:5px;
+      cursor:pointer;
+      font-weight:bold;
+    }
+
+    button:hover { opacity:0.9; }
+
+    .btn-upload { background:#3498db; color:white; }
+    .btn-save { background:#2ecc71; color:white; }
+    .btn-delete { background:#e74c3c; color:white; }
+    .btn-undo { background:#f39c12; color:white; }
+
+    #polygonCount {
+      margin-top:10px;
+      font-size:18px;
+      font-weight:bold;
+      color:#333;
+    }
+  </style>
 </head>
 
 <body style="text-align:center">
@@ -10,16 +39,20 @@
 <h2>🌳 Tree Detection</h2>
 
 <input type="file" id="imageInput" required>
-<button onclick="uploadImage()">Upload</button>
+<button class="btn-upload" onclick="uploadImage()">Upload</button>
 
 <br><br>
 
-<canvas id="canvas" style="border:1px solid black"></canvas>
+<canvas id="canvas" style="border:2px solid #333"></canvas>
 
 <br><br>
-<button onclick="savePolygons()">💾 Save</button>
-<button onclick="deletePolygon()">🗑 Delete Polygon</button>
-<button onclick="undo()">↩️ Undo</button>
+
+<button class="btn-save" onclick="savePolygons()">💾 Save</button>
+<button class="btn-delete" onclick="deletePolygon()">🗑 Delete Polygon</button>
+<button class="btn-undo" onclick="undo()">↩️ Undo</button>
+
+<!-- Polygon count -->
+<div id="polygonCount">Polygons: 0</div>
 
 <div id="result"></div>
 
@@ -30,10 +63,18 @@ let history = [];
 let isRestoring = false;
 let currentImageFile = "";
 
+// =======================
+// Polygon Count Function
+// =======================
+function updatePolygonCount() {
+  const count = canvas.getObjects().filter(o => o.type === 'polygon').length;
+  document.getElementById("polygonCount").innerText = "Polygons: " + count;
+}
+
 // Track changes
-canvas.on('object:added', () => saveState());
+canvas.on('object:added', () => { saveState(); updatePolygonCount(); });
 canvas.on('object:modified', () => saveState());
-canvas.on('object:removed', () => saveState());
+canvas.on('object:removed', () => { saveState(); updatePolygonCount(); });
 
 // Upload image and get result
 async function uploadImage() {
@@ -95,6 +136,7 @@ function loadCanvas(imageUrl, polygons) {
 
     canvas.renderAll();
     saveState();
+    updatePolygonCount(); // update after load
   });
 }
 
@@ -214,12 +256,12 @@ function undo() {
       if (obj.type === 'polygon') enableVertexEditing(obj);
     });
 
+    updatePolygonCount();
     isRestoring = false;
   });
 }
 
 // Save to backend
-// Save polygons and show preview
 function savePolygons() {
 
   if (!currentImageFile) {
@@ -244,7 +286,6 @@ function savePolygons() {
 
       const url = "https://tree-detection-project.onrender.com/static/" + res.image;
 
-      // ✅ Show preview + success message + download button
       document.getElementById("result").innerHTML = `
         <p style="color:green;font-weight:bold;">
           ✔ Image saved successfully
