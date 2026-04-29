@@ -219,6 +219,7 @@ function undo() {
 }
 
 // Save to backend
+// Save polygons and show preview
 function savePolygons() {
 
   if (!currentImageFile) {
@@ -243,13 +244,20 @@ function savePolygons() {
 
       const url = "https://tree-detection-project.onrender.com/static/" + res.image;
 
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = res.image;
-      a.click();
+      // ✅ Show preview + success message + download button
+      document.getElementById("result").innerHTML = `
+        <p style="color:green;font-weight:bold;">
+          ✔ Image saved successfully
+        </p>
 
-      document.getElementById("result").innerHTML =
-        `<img src="${url}" width="400">`;
+        <img src="${url}" width="400" style="border:2px solid green; margin-top:10px;">
+
+        <br><br>
+
+        <a href="${url}" download="${res.image}">
+          <button>⬇ Download Image</button>
+        </a>
+      `;
     }
   });
 }
