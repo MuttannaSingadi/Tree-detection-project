@@ -263,31 +263,49 @@ function undo() {
 }
 
 // =======================
-// ADD POLYGON DRAW MODE
+// ADVANCED POLYGON DRAWING
 // =======================
 
 let drawing = false;
 let points = [];
 let tempLines = [];
+let previewLine = null;
 
 // Start drawing
 function startDrawing() {
   drawing = true;
   points = [];
+
   tempLines.forEach(l => canvas.remove(l));
   tempLines = [];
+
+  if (previewLine) canvas.remove(previewLine);
+  previewLine = null;
 }
 
-// Handle mouse click
+// LEFT CLICK → add point
 canvas.on('mouse:down', function(options) {
 
   if (!drawing) return;
 
+  // Right click handled separately
+  if (options.e.button === 2) return;
+
   const pointer = canvas.getPointer(options.e);
+
+  // Snap to first point if close
+  if (points.length > 2) {
+    const first = points[0];
+    const dist = Math.hypot(pointer.x - first.x, pointer.y - first.y);
+
+    if (dist < 10) {
+      finishPolygon();
+      return;
+    }
+  }
 
   points.push({ x: pointer.x, y: pointer.y });
 
-  // draw temporary line
   if (points.length > 1) {
     const line = new fabric.Line([
       points[points.length - 2].x,
@@ -304,16 +322,65 @@ canvas.on('mouse:down', function(options) {
   }
 });
 
-// Finish polygon on double click
+// MOUSE MOVE → preview line
+canvas.on('mouse:move', function(options) {
+
+  if (!drawing || points.length === 0) return;
+
+  const pointer = canvas.getPointer(options.e);
+
+  if (previewLine) canvas.remove(previewLine);
+
+  const last = points[points.length - 1];
+
+  previewLine = new fabric.Line([
+    last.x, last.y,
+    pointer.x, pointer.y
+  ], {
+    stroke: 'blue',
+    strokeDashArray: [5, 5],
+    selectable: false
+  });
+
+  canvas.add(previewLine);
+});
+
+// RIGHT CLICK → remove last point
+canvas.upperCanvasEl.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+
+  if (!drawing || points.length === 0) return;
+
+  points.pop();
+
+  const line = tempLines.pop();
+  if (line) canvas.remove(line);
+
+  if (previewLine) {
+    canvas.remove(previewLine);
+    previewLine = null;
+  }
+
+  canvas.renderAll();
+});
+
+// DOUBLE CLICK → finish polygon
 canvas.on('mouse:dblclick', function() {
+  finishPolygon();
+});
+
+// Finish polygon
+function finishPolygon() {
 
   if (!drawing || points.length < 3) return;
 
   drawing = false;
 
-  // remove temp lines
   tempLines.forEach(l => canvas.remove(l));
   tempLines = [];
+
+  if (previewLine) canvas.remove(previewLine);
+  previewLine = null;
 
   const polygon = new fabric.Polygon(points, {
     fill: 'rgba(0,255,0,0.3)',
@@ -326,7 +393,7 @@ canvas.on('mouse:dblclick', function() {
   enableVertexEditing(polygon);
 
   points = [];
-});
+}
 
 // Save to backend
 function savePolygons() {
