@@ -9,12 +9,11 @@
 
 <h2>🌳 Tree Detection</h2>
 
-<form method="POST" enctype="multipart/form-data">
-  <input type="file" name="image" required>
-  <button type="submit">Upload</button>
-</form>
+<!-- ✅ UPDATED FORM -->
+<input type="file" id="imageInput" required>
+<button onclick="uploadImage()">Upload</button>
 
-{% if result %}
+<br><br>
 
 <canvas id="canvas" style="border:1px solid black"></canvas>
 
@@ -28,67 +27,93 @@
 <script>
 const canvas = new fabric.Canvas('canvas');
 
-// 🔥 ADD THIS
 let history = [];
 let isRestoring = false;
-
-// Save state on changes
-canvas.on('object:added', saveState);
-canvas.on('object:modified', saveState);
-canvas.on('object:removed', saveState);
+let currentImageFile = "";
 
 // =======================
-// ✅ LOAD IMAGE + POLYGONS
+// 🚀 CALL RENDER BACKEND
 // =======================
-fabric.Image.fromURL("{{ url_for('static', filename=image_file) }}", function(img) {
+async function uploadImage() {
 
-  canvas.setWidth(img.width);
-  canvas.setHeight(img.height);
+  const fileInput = document.getElementById("imageInput");
 
-  canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+  if (!fileInput.files.length) {
+    alert("Select image first");
+    return;
+  }
 
-  const polygons = {{ polygons | tojson | safe }};
+  const formData = new FormData();
+  formData.append("image", fileInput.files[0]);
 
-  polygons.forEach(poly => {
-
-    const pts = poly.map(p => ({ x: p[0], y: p[1] }));
-
-    const shape = new fabric.Polygon(pts, {
-      fill: 'rgba(255,0,0,0.3)',
-      stroke: 'red',
-      strokeWidth: 2,
-      selectable: true,
-      objectCaching: false
-    });
-
-    canvas.add(shape);
-
-    enableVertexEditing(shape);
+  // ✅ FIXED URL
+  const response = await fetch("https://tree-detection-project.onrender.com/", {
+    method: "POST",
+    body: formData
   });
 
-  canvas.renderAll();
+  const html = await response.text();
 
-  // 🔥 ADD THIS (initial state)
-  saveState();
-});
+  // Extract needed data
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
 
+  const img = doc.querySelector("img");
+  if (!img) {
+    alert("Error processing image");
+    return;
+  }
+
+  const imageUrl = img.src;
+  currentImageFile = imageUrl.split("/").pop();
+
+  loadCanvas(imageUrl, []);
+}
 
 // =======================
-// 🔥 VERTEX EDITING
+// LOAD IMAGE
+// =======================
+function loadCanvas(imageUrl, polygons) {
+
+  fabric.Image.fromURL(imageUrl, function(img) {
+
+    canvas.setWidth(img.width);
+    canvas.setHeight(img.height);
+    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+
+    polygons.forEach(poly => {
+      const pts = poly.map(p => ({ x: p[0], y: p[1] }));
+
+      const shape = new fabric.Polygon(pts, {
+        fill: 'rgba(255,0,0,0.3)',
+        stroke: 'red',
+        strokeWidth: 2,
+        selectable: true,
+        objectCaching: false
+      });
+
+      canvas.add(shape);
+      enableVertexEditing(shape);
+    });
+
+    canvas.renderAll();
+    saveState();
+  });
+}
+
+// =======================
+// 🔥 VERTEX EDITING (UNCHANGED)
 // =======================
 function enableVertexEditing(polygon) {
 
   polygon.cornerStyle = 'circle';
   polygon.cornerColor = 'blue';
-
   polygon.controls = {};
 
   polygon.points.forEach((point, index) => {
 
     polygon.controls["p" + index] = new fabric.Control({
-
       positionHandler: function(dim, finalMatrix, fabricObject) {
-
         const x = fabricObject.points[index].x - fabricObject.pathOffset.x;
         const y = fabricObject.points[index].y - fabricObject.pathOffset.y;
 
@@ -116,7 +141,6 @@ function enableVertexEditing(polygon) {
 
         polygon.setCoords();
         canvas.renderAll();
-
         return true;
       },
 
@@ -128,9 +152,8 @@ function enableVertexEditing(polygon) {
   polygon.setCoords();
 }
 
-
 // =======================
-// ✅ GET POLYGONS
+// GET POLYGONS (UNCHANGED)
 // =======================
 function getPolygons() {
 
@@ -149,30 +172,20 @@ function getPolygons() {
 
         const pt = fabric.util.transformPoint(local, matrix);
 
-        return {
-          x: pt.x,
-          y: pt.y
-        };
+        return { x: pt.x, y: pt.y };
       });
 
     });
 }
 
-
 // =======================
-// 🗑 DELETE POLYGON
+// DELETE (UNCHANGED)
 // =======================
 function deletePolygon() {
-
   const activeObject = canvas.getActiveObject();
 
-  if (!activeObject) {
+  if (!activeObject || activeObject.type !== 'polygon') {
     alert("Select a polygon first");
-    return;
-  }
-
-  if (activeObject.type !== 'polygon') {
-    alert("Selected object is not a polygon");
     return;
   }
 
@@ -181,26 +194,16 @@ function deletePolygon() {
   canvas.renderAll();
 }
 
-
 // =======================
-// 🔥 FIXED UNDO SYSTEM
+// UNDO (UNCHANGED)
 // =======================
-
-// Save state
 function saveState() {
-
   if (isRestoring) return;
 
-  const json = canvas.toJSON();
-
-  history.push(json);
-
-  if (history.length > 20) {
-    history.shift();
-  }
+  history.push(canvas.toJSON());
+  if (history.length > 20) history.shift();
 }
 
-// Undo
 function undo() {
 
   if (history.length <= 1) {
@@ -210,7 +213,7 @@ function undo() {
 
   isRestoring = true;
 
-  history.pop(); // remove current state
+  history.pop();
   const prevState = history[history.length - 1];
 
   canvas.loadFromJSON(prevState, function () {
@@ -218,29 +221,26 @@ function undo() {
     canvas.renderAll();
 
     canvas.getObjects().forEach(obj => {
-      if (obj.type === 'polygon') {
-        enableVertexEditing(obj);
-      }
+      if (obj.type === 'polygon') enableVertexEditing(obj);
     });
 
     isRestoring = false;
   });
 }
 
-
 // =======================
-// 💾 SAVE IMAGE
+// SAVE TO BACKEND
 // =======================
 function savePolygons() {
 
   const data = getPolygons();
 
-  fetch("/save", {
+  fetch("https://tree-detection-project.onrender.com/save", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
     body: JSON.stringify({
       polygons: data,
-      image_file: "{{ image_file }}"
+      image_file: currentImageFile
     })
   })
   .then(res => res.json())
@@ -248,7 +248,7 @@ function savePolygons() {
 
     if (res.status === "success") {
 
-      const url = "/static/" + res.image;
+      const url = "https://tree-detection-project.onrender.com/static/" + res.image;
 
       const a = document.createElement("a");
       a.href = url;
@@ -261,8 +261,6 @@ function savePolygons() {
   });
 }
 </script>
-
-{% endif %}
 
 </body>
 </html>
