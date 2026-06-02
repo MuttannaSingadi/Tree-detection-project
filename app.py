@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from flask_cors import CORS   # ✅ ADDED
+from flask_cors import CORS 
 import cv2
 import torch
 import numpy as np
@@ -9,14 +9,14 @@ import gdown
 from train import UNet
 
 app = Flask(__name__)
-CORS(app)   # ✅ ADDED (VERY IMPORTANT)
+CORS(app)   
 
 os.makedirs("static", exist_ok=True)
 
 # Load model
 model = UNet()
 
-# Download model if not exists
+
 MODEL_PATH = "tree_model.pth"
 
 if not os.path.exists(MODEL_PATH):
@@ -32,12 +32,12 @@ model.eval()
 def index():
     if request.method == "POST":
         if "image" not in request.files:
-            return jsonify({"error": "No image"})   # ✅ small fix for API
+            return jsonify({"error": "No image"}) 
 
         file = request.files["image"]
 
         if file.filename == "":
-            return jsonify({"error": "Empty file"})  # ✅ small fix
+            return jsonify({"error": "Empty file"}) 
 
         filename = f"{int(time.time())}.jpg"
         filepath = os.path.join("static", filename)
